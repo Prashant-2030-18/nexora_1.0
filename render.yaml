@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: nexora-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # ─── Set these values in the Render Dashboard — NOT in this file ───
+      # DATABASE_URL: (sync: false)
+      # NER_SECRET_KEY: (sync: false)
+      # FRONTEND_ORIGIN: (sync: false)
+      # SUPABASE_URL: (sync: false)
+      # SUPABASE_SERVICE_ROLE_KEY: (sync: false)
+      # SUPABASE_STORAGE_BUCKET: (sync: false)
+      # GEMINI_API_KEY: (sync: false)
+      # OPENWEATHER_API_KEY: (sync: false)
+      # GOOGLE_MAPS_API_KEY: (sync: false)
+      # ADMIN_EMAIL: (sync: false)
+      # ADMIN_PASSWORD: (sync: false)
+      # ─── Safe non-secret defaults that can live here ───
+      - key: ENVIRONMENT
+        value: production
+      - key: SMS_PROVIDER
+        value: simulation
+      - key: SATELLITE_PROVIDER
+        value: simulation
+      - key: SACHET_CAP_URL
+        value: https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile
+      - key: SACHET_NDMA_BASE_URL
+        value: https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile
+      - key: SACHET_ALERT_INDEX_URL
+        value: https://sachet.ndma.gov.in/cap_public_website/FetchAllAlertDetails
+      - key: SACHET_LISTING_URL
+        value: https://sachet.ndma.gov.in/cap_public_website/FetchAllAlertDetails
+      - key: SACHET_POLL_INTERVAL_SEC
+        value: "300"
+      - key: SACHET_REQUEST_TIMEOUT
+        value: "15"
