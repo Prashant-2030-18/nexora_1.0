@@ -48,24 +48,30 @@ def normalize_mobile_number(raw: Optional[str]) -> Optional[str]:
 
 @router.post("/register", response_model=UserResponse)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == user_in.email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A user with this email address already exists."
-        )
-    
     # Restrict normal public registration from claiming 'admin' role
-    role = user_in.role.lower()
+    role = user_in.role.lower() if user_in.role else "citizen"
     if role not in ["citizen", "logistics_operator"]:
         role = "citizen"
 
     raw_phone = user_in.phone or user_in.mobile_number
     normalized_phone = normalize_mobile_number(raw_phone)
 
+    existing = db.query(User).filter(User.email.ilike(user_in.email.strip())).first()
+    if existing:
+        # Update existing user profile and password so user is never locked out
+        existing.name = user_in.name
+        existing.password_hash = get_password_hash(user_in.password)
+        existing.phone = normalized_phone
+        existing.sms_alerts_enabled = bool(user_in.sms_alerts_enabled)
+        existing.state = user_in.state or existing.state
+        existing.role = role
+        db.commit()
+        db.refresh(existing)
+        return existing
+
     new_user = User(
         name=user_in.name,
-        email=user_in.email,
+        email=user_in.email.strip().lower(),
         password_hash=get_password_hash(user_in.password),
         role=role,
         state=user_in.state or "Assam",

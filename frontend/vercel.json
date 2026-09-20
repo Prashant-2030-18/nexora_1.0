@@ -1,6 +1,18 @@
 {
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "https://nexora-api-bybb.onrender.com/api/$1"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "https://nexora-api-bybb.onrender.com/uploads/$1"
+    },
+    {
+      "source": "/health",
+      "destination": "https://nexora-api-bybb.onrender.com/health"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

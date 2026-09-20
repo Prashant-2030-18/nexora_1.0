@@ -8,10 +8,12 @@ import {
 } from '../types';
 
 // ── API base URL configuration ────────────────────────────────────────────────
-// In local dev (no VITE_API_BASE_URL): uses '/api' so Vite proxy forwards to localhost:8000
-// In production (Vercel → Render): uses the full backend URL from VITE_API_BASE_URL
+// In local dev: uses '/api' so Vite proxy forwards to localhost:8000
+// In production: uses VITE_API_BASE_URL or defaults to the live Render backend
 const _rawBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
-const API_BASE_URL = _rawBase ? _rawBase.replace(/\/$/, '') : '';
+const API_BASE_URL = _rawBase 
+  ? _rawBase.replace(/\/$/, '') 
+  : (import.meta.env.PROD ? 'https://nexora-api-bybb.onrender.com' : '');
 const API_BASE = `${API_BASE_URL}/api`;
 
 const apiClient = axios.create({
