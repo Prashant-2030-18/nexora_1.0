@@ -107,13 +107,19 @@ UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 (UPLOAD_ROOT / "reports").mkdir(parents=True, exist_ok=True)
 
 # Enable CORS for frontend integration
-_dev_origins = ["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173"]
+_dev_origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "https://nexora-1-0.vercel.app",
+]
 _prod_origins = [o.strip() for o in settings.FRONTEND_ORIGIN.split(",") if o.strip()]
 _allowed_origins = list(dict.fromkeys(_dev_origins + _prod_origins))  # dedup, preserve order
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
