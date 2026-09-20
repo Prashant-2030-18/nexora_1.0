@@ -50,17 +50,36 @@ export const Login: React.FC = () => {
       await login(email, password);
       navigate('/dashboard');
     } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      if (!detail) {
-        setError('Authentication failed. Please check your email and password.');
-      } else if (detail.toLowerCase().includes('not found') || detail.toLowerCase().includes('does not exist')) {
+      console.error('[NEXORA LOGIN ERROR]', err);
+      let errorMsg = '';
+      const data = err?.response?.data;
+      if (data) {
+        if (typeof data.detail === 'string') {
+          errorMsg = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          errorMsg = data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+        } else if (typeof data === 'string' && data.length < 200) {
+          errorMsg = data;
+        }
+      }
+      if (!errorMsg) {
+        if (err.message === 'Network Error') {
+          errorMsg = 'Cannot connect to backend server. Please verify connection.';
+        } else if (err.code === 'ECONNABORTED') {
+          errorMsg = 'Request timed out. Server may be waking up — please try again.';
+        } else {
+          errorMsg = err.message || 'Authentication failed. Please check your email and password.';
+        }
+      }
+
+      if (errorMsg.toLowerCase().includes('not found') || errorMsg.toLowerCase().includes('does not exist')) {
         setError('Account not found. Please register first.');
-      } else if (detail.toLowerCase().includes('deactivated') || detail.toLowerCase().includes('inactive')) {
+      } else if (errorMsg.toLowerCase().includes('deactivated') || errorMsg.toLowerCase().includes('inactive')) {
         setError('Your account is inactive. Contact the administrator.');
-      } else if (detail.toLowerCase().includes('pending')) {
+      } else if (errorMsg.toLowerCase().includes('pending')) {
         setError('Your account is pending approval.');
       } else {
-        setError(detail);
+        setError(errorMsg);
       }
     } finally {
       setLoading(false);
@@ -114,11 +133,32 @@ export const Login: React.FC = () => {
         setIsRegistering(false);
       }, 2000);
     } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      if (detail?.toLowerCase().includes('already exists')) {
+      console.error('[NEXORA REGISTRATION ERROR]', err);
+      let errorMsg = '';
+      const data = err?.response?.data;
+      if (data) {
+        if (typeof data.detail === 'string') {
+          errorMsg = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          errorMsg = data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+        } else if (typeof data === 'string' && data.length < 200) {
+          errorMsg = data;
+        }
+      }
+      if (!errorMsg) {
+        if (err.message === 'Network Error') {
+          errorMsg = 'Cannot connect to backend server. Please verify connection.';
+        } else if (err.code === 'ECONNABORTED') {
+          errorMsg = 'Request timed out. Server may be waking up — please try again.';
+        } else {
+          errorMsg = err.message || 'Registration failed. Please try again.';
+        }
+      }
+
+      if (errorMsg.toLowerCase().includes('already exists')) {
         setError('An account with this email address already exists. Please sign in.');
       } else {
-        setError(detail || 'Registration failed. Please try again.');
+        setError(errorMsg);
       }
     } finally {
       setLoading(false);
