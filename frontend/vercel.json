@@ -9,6 +9,10 @@
       "destination": "https://nexora-api-bybb.onrender.com/uploads/$1"
     },
     {
+      "source": "/health/(.*)",
+      "destination": "https://nexora-api-bybb.onrender.com/health/$1"
+    },
+    {
       "source": "/health",
       "destination": "https://nexora-api-bybb.onrender.com/health"
     },

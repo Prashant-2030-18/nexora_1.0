@@ -28,8 +28,9 @@ export const Login: React.FC = () => {
   const [regRole, setRegRole] = useState<'citizen' | 'logistics_operator'>('citizen');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
+  const [isWakingUp, setIsWakingUp] = useState(false);
 
-  const { login } = useAuth();
+  const { login, registerAndLogin } = useAuth();
   const navigate = useNavigate();
 
   const switchToLogin = () => {
@@ -46,11 +47,13 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    setIsWakingUp(false);
     try {
       await login(email, password);
       navigate('/dashboard');
     } catch (err: any) {
       console.error('[NEXORA LOGIN ERROR]', err);
+      const httpStatus = err?.response?.status;
       let errorMsg = '';
       const data = err?.response?.data;
       if (data) {
@@ -63,10 +66,15 @@ export const Login: React.FC = () => {
         }
       }
       if (!errorMsg) {
-        if (err.message === 'Network Error') {
-          errorMsg = 'Cannot connect to backend server. Please verify connection.';
+        if (httpStatus === 502 || httpStatus === 503 || httpStatus === 504) {
+          setIsWakingUp(true);
+          errorMsg = 'The secure server is currently waking up from idle. Please wait ~20 seconds and click Sign In again.';
+        } else if (err.message === 'Network Error') {
+          setIsWakingUp(true);
+          errorMsg = 'Cannot connect to server. The backend may be spinning up — please wait a few seconds and try again.';
         } else if (err.code === 'ECONNABORTED') {
-          errorMsg = 'Request timed out. Server may be waking up — please try again.';
+          setIsWakingUp(true);
+          errorMsg = 'Connection timed out while server was waking up. Please try again.';
         } else {
           errorMsg = err.message || 'Authentication failed. Please check your email and password.';
         }
@@ -89,6 +97,7 @@ export const Login: React.FC = () => {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsWakingUp(false);
 
     if (regPassword.length < 8) {
       setError('Password must be at least 8 characters long.');
@@ -117,9 +126,9 @@ export const Login: React.FC = () => {
 
     setLoading(true);
     try {
-      await api.register({
-        name: regName,
-        email: regEmail,
+      await registerAndLogin({
+        name: regName.trim(),
+        email: regEmail.trim(),
         password: regPassword,
         role: regRole,
         state: regState,
@@ -129,11 +138,11 @@ export const Login: React.FC = () => {
       });
       setRegSuccess(true);
       setTimeout(() => {
-        setRegSuccess(false);
-        setIsRegistering(false);
-      }, 2000);
+        navigate('/dashboard');
+      }, 800);
     } catch (err: any) {
       console.error('[NEXORA REGISTRATION ERROR]', err);
+      const httpStatus = err?.response?.status;
       let errorMsg = '';
       const data = err?.response?.data;
       if (data) {
@@ -146,16 +155,23 @@ export const Login: React.FC = () => {
         }
       }
       if (!errorMsg) {
-        if (err.message === 'Network Error') {
-          errorMsg = 'Cannot connect to backend server. Please verify connection.';
+        if (httpStatus === 409) {
+          errorMsg = 'An account with this email address already exists. Please sign in.';
+        } else if (httpStatus === 502 || httpStatus === 503 || httpStatus === 504) {
+          setIsWakingUp(true);
+          errorMsg = 'The secure server is currently waking up from idle. Please wait ~20 seconds and click Create Account again.';
+        } else if (err.message === 'Network Error') {
+          setIsWakingUp(true);
+          errorMsg = 'Cannot connect to backend server. The instance may be waking up — please try again in a few seconds.';
         } else if (err.code === 'ECONNABORTED') {
-          errorMsg = 'Request timed out. Server may be waking up — please try again.';
+          setIsWakingUp(true);
+          errorMsg = 'Request timed out while server was waking up. Please try again in a few seconds.';
         } else {
           errorMsg = err.message || 'Registration failed. Please try again.';
         }
       }
 
-      if (errorMsg.toLowerCase().includes('already exists')) {
+      if (httpStatus === 409 || errorMsg.toLowerCase().includes('already exists')) {
         setError('An account with this email address already exists. Please sign in.');
       } else {
         setError(errorMsg);
@@ -218,10 +234,16 @@ export const Login: React.FC = () => {
               <span>{error}</span>
             </div>
           )}
+          {isWakingUp && (
+            <div className="p-3.5 rounded-xl bg-amber-950/50 border border-amber-800/60 text-amber-200 text-xs flex items-center gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+              <span>Secure server is waking up from standby (~20-30s). Please wait a moment...</span>
+            </div>
+          )}
           {regSuccess && (
             <div className="p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-emerald-200 text-xs flex items-center gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Account created successfully! Please sign in with your credentials.</span>
+              <span>Account created successfully! Logging you into NEXORA...</span>
             </div>
           )}
 

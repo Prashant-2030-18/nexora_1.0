@@ -16,6 +16,9 @@ const _rawBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
 const API_BASE_URL = _rawBase ? _rawBase.replace(/\/$/, '') : '';
 const API_BASE = `${API_BASE_URL}/api`;
 
+export const TOKEN_KEY = 'ner_token';
+export const USER_KEY = 'ner_user';
+
 const apiClient = axios.create({
   baseURL: API_BASE,
   headers: {
@@ -27,7 +30,7 @@ const apiClient = axios.create({
 
 // Intercept requests to attach JWT token
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('ner_token');
+  const token = localStorage.getItem(TOKEN_KEY);
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -53,6 +56,30 @@ export const api = {
     const healthUrl = `${API_BASE_URL}/health`;
     const res = await axios.get<{ status: string; service?: string }>(healthUrl, { timeout: 8000 });
     return res.data;
+  },
+  getHealthLive: async () => {
+    const res = await axios.get<{ status: string; service?: string }>(`${API_BASE_URL}/health/live`, { timeout: 6000 });
+    return res.data;
+  },
+  getHealthReady: async () => {
+    const res = await axios.get<{ status: string; database?: string; service?: string }>(`${API_BASE_URL}/health/ready`, { timeout: 8000 });
+    return res.data;
+  },
+  wakeUpBackend: async (onProgress?: (attempt: number, elapsedSec: number) => void): Promise<boolean> => {
+    const startTime = Date.now();
+    let attempt = 0;
+    while (Date.now() - startTime < 35000) {
+      attempt++;
+      try {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        if (onProgress) onProgress(attempt, elapsed);
+        const res = await axios.get(`${API_BASE_URL}/health/live`, { timeout: 4000 });
+        if (res.status === 200) return true;
+      } catch {
+        await new Promise((r) => setTimeout(r, Math.min(1200 * Math.pow(1.25, attempt), 3500)));
+      }
+    }
+    return false;
   },
 
   // States & Districts

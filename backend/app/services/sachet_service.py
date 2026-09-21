@@ -744,7 +744,7 @@ def get_sachet_sync_status(db: Session) -> Dict[str, Any]:
     status_code = "UNAVAILABLE"
     status_badge = "FEED UNAVAILABLE"
     is_live = False
-    http_status = last_log.response_time_ms  # placeholder; prefer etag http
+    http_status = (last_log.response_time_ms if last_log else None)  # placeholder; prefer etag http
     recent_etag_statuses = [r.http_status for r in etag_rows if r.last_checked_at and (now - r.last_checked_at).total_seconds() < 3600]
     recent_http = next((s for s in recent_etag_statuses if s is not None), None)
     if last_log and getattr(last_log, "error_message", None) is None and last_log.status == "SUCCESS":

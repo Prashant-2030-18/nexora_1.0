@@ -53,25 +53,37 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     if role not in ["citizen", "logistics_operator"]:
         role = "citizen"
 
+    # Password complexity validation
+    if not user_in.password or len(user_in.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long."
+        )
+    if not re.search(r"[A-Z]", user_in.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one uppercase letter."
+        )
+    if not re.search(r"[0-9]", user_in.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one number."
+        )
+
     raw_phone = user_in.phone or user_in.mobile_number
     normalized_phone = normalize_mobile_number(raw_phone)
 
-    existing = db.query(User).filter(User.email.ilike(user_in.email.strip())).first()
+    norm_email = user_in.email.strip().lower()
+    existing = db.query(User).filter(User.email.ilike(norm_email)).first()
     if existing:
-        # Update existing user profile and password so user is never locked out
-        existing.name = user_in.name
-        existing.password_hash = get_password_hash(user_in.password)
-        existing.phone = normalized_phone
-        existing.sms_alerts_enabled = bool(user_in.sms_alerts_enabled)
-        existing.state = user_in.state or existing.state
-        existing.role = role
-        db.commit()
-        db.refresh(existing)
-        return existing
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email address already exists. Please sign in."
+        )
 
     new_user = User(
-        name=user_in.name,
-        email=user_in.email.strip().lower(),
+        name=user_in.name.strip(),
+        email=norm_email,
         password_hash=get_password_hash(user_in.password),
         role=role,
         state=user_in.state or "Assam",
@@ -96,7 +108,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == login_data.email).first()
+    norm_email = login_data.email.strip().lower()
+    user = db.query(User).filter(User.email.ilike(norm_email)).first()
 
     # Use a generic message for both "not found" and "wrong password" to prevent user enumeration
     if not user:
