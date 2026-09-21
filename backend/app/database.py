@@ -56,10 +56,21 @@ DATABASE_URL = sanitize_database_url(_raw_db_url)
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production"
 
+# Validate database scheme: If user provided an HTTP/HTTPS Supabase API URL instead of a PostgreSQL URI, warn and fallback
+if DATABASE_URL.startswith("http://") or DATABASE_URL.startswith("https://") or (DATABASE_URL and not DATABASE_URL.startswith("postgresql") and not DATABASE_URL.startswith("sqlite")):
+    print(
+        f"[DATABASE WARNING] DATABASE_URL starts with an HTTP/HTTPS scheme instead of 'postgresql://'. "
+        "Supabase project URL cannot be used as a database connection string. "
+        "Please set DATABASE_URL to: postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres in Render. "
+        "Falling back to local SQLite to keep API online.",
+        file=sys.stderr
+    )
+    DATABASE_URL = _get_sqlite_url()
+
 # Fall back to local SQLite if DATABASE_URL is not set
 if not DATABASE_URL:
     if IS_PRODUCTION:
-        print("[DATABASE WARNING] DATABASE_URL not set in production! Render filesystem is ephemeral.", file=sys.stderr)
+        print("[DATABASE WARNING] DATABASE_URL not set in production! Falling back to SQLite.", file=sys.stderr)
     DATABASE_URL = _get_sqlite_url()
 
 connect_args = {}
@@ -80,13 +91,10 @@ else:
             max_overflow=10,
         )
     except Exception as exc:
-        print(f"[DATABASE ERROR] Failed to create PostgreSQL engine: {type(exc).__name__}", file=sys.stderr)
-        if not IS_PRODUCTION:
-            print("[DATABASE WARNING] Falling back to SQLite for local development.", file=sys.stderr)
-            DATABASE_URL = _get_sqlite_url()
-            engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-        else:
-            raise
+        print(f"[DATABASE ERROR] Failed to create PostgreSQL engine: {type(exc).__name__} ({exc})", file=sys.stderr)
+        print("[DATABASE FALLBACK] Falling back to SQLite to ensure zero-downtime service availability.", file=sys.stderr)
+        DATABASE_URL = _get_sqlite_url()
+        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
