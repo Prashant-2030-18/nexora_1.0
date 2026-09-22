@@ -24,8 +24,8 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // Default timeout — generous for Render cold starts
-  timeout: 30000,
+  // Generous 60s timeout for Render server cold starts from standby
+  timeout: 60000,
 });
 
 // Intercept requests to attach JWT token

@@ -207,6 +207,12 @@ def on_startup():
         except Exception as seed_err:
             print(f"[SEED NOTICE] Seed initialization skipped or completed: {seed_err}")
 
+        try:
+            from .user_registry import sync_registry_to_db
+            sync_registry_to_db(db)
+        except Exception as reg_err:
+            print(f"[REGISTRY NOTICE] User registry sync: {reg_err}")
+
         # Check if an administrator exists
         admin_count = db.query(User).filter(User.role == "admin").count()
         if admin_count == 0:

@@ -48,8 +48,16 @@ export const Login: React.FC = () => {
     setError(null);
     setLoading(true);
     setIsWakingUp(false);
+
+    // Show waking-up notice if backend response takes longer than 2.5s (Render cold start)
+    const wakeTimer = setTimeout(() => {
+      setIsWakingUp(true);
+    }, 2500);
+
     try {
       const meUser = await login(email.trim().toLowerCase(), password);
+      clearTimeout(wakeTimer);
+      setIsWakingUp(false);
       const role = (meUser?.role || '').toLowerCase();
       if (role === 'admin') {
         navigate('/admin');
@@ -61,6 +69,7 @@ export const Login: React.FC = () => {
         navigate('/dashboard');
       }
     } catch (err: any) {
+      clearTimeout(wakeTimer);
       console.error('[NEXORA LOGIN ERROR]', err);
       const httpStatus = err?.response?.status;
       let errorMsg = '';
