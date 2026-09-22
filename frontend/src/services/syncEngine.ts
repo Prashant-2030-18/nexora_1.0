@@ -27,6 +27,7 @@ import {
   getPendingSyncItems, updateSyncItemStatus, deleteSyncedItems,
   setSyncMetadata, getSyncMetadata, cacheHazards, cleanupAfterSync,
 } from './offlineStore';
+import { TOKEN_KEY } from './api';
 
 const API_BASE = '/api';
 
@@ -34,7 +35,7 @@ const API_BASE = '/api';
 const RETRY_DELAYS = [5_000, 15_000, 30_000, 60_000, 300_000];
 
 function getToken(): string | null {
-  return localStorage.getItem('ner_token');
+  return localStorage.getItem(TOKEN_KEY);
 }
 
 async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {

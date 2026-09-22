@@ -13,6 +13,7 @@
  */
 
 import { GPSState } from '../types';
+import { TOKEN_KEY } from './api';
 import {
   saveJourneyState, getJourneyState, deleteJourneyState,
   getAllJourneyStates, cacheRoute, JourneyStateRecord, CachedRoute,
@@ -57,7 +58,7 @@ let _currentProgress: number = 0;
 let _isOnline: boolean = true;
 
 function getToken(): string | null {
-  return localStorage.getItem('ner_token');
+  return localStorage.getItem(TOKEN_KEY);
 }
 
 async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {

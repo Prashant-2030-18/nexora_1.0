@@ -49,8 +49,17 @@ export const Login: React.FC = () => {
     setLoading(true);
     setIsWakingUp(false);
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const meUser = await login(email.trim().toLowerCase(), password);
+      const role = (meUser?.role || '').toLowerCase();
+      if (role === 'admin') {
+        navigate('/admin');
+      } else if (role === 'government' || role === 'official') {
+        navigate('/government');
+      } else if (role === 'citizen') {
+        navigate('/citizen');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       console.error('[NEXORA LOGIN ERROR]', err);
       const httpStatus = err?.response?.status;

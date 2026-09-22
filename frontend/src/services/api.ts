@@ -16,10 +16,10 @@ const _rawBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
 const API_BASE_URL = _rawBase ? _rawBase.replace(/\/$/, '') : '';
 const API_BASE = `${API_BASE_URL}/api`;
 
-export const TOKEN_KEY = 'ner_token';
-export const USER_KEY = 'ner_user';
+export const TOKEN_KEY = 'nexora_access_token';
+export const USER_KEY = 'nexora_user';
 
-const apiClient = axios.create({
+export const apiClient = axios.create({
   baseURL: API_BASE,
   headers: {
     'Content-Type': 'application/json',

@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
-import { api, TOKEN_KEY, USER_KEY } from '../services/api';
+import { api, apiClient, TOKEN_KEY, USER_KEY } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  registerAndLogin: (userData: { name: string; email: string; password: string; role?: string; state?: string; phone?: string; mobile_number?: string; sms_alerts_enabled?: boolean }) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  registerAndLogin: (userData: { name: string; email: string; password: string; role?: string; state?: string; phone?: string; mobile_number?: string; sms_alerts_enabled?: boolean }) => Promise<User>;
   logout: () => void;
   hasRole: (roles: UserRole[]) => boolean;
 }
@@ -26,7 +26,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => {
+    const savedToken = localStorage.getItem(TOKEN_KEY);
+    if (savedToken) {
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+    }
+    return savedToken;
+  });
 
   const [isLoading, setIsLoading] = useState<boolean>(() => {
     const hasToken = !!localStorage.getItem(TOKEN_KEY);
@@ -45,6 +51,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
       try {
         const userData = await api.getMe();
         if (isMounted) {
@@ -60,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('[NEXORA AUTH] Token rejected by server. Clearing credentials.');
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
+          delete apiClient.defaults.headers.common['Authorization'];
           if (isMounted) {
             setToken(null);
             setUser(null);
@@ -83,29 +92,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
     try {
-      const res = await api.login({ email, password });
+      const res = await api.login({ email: cleanEmail, password });
       localStorage.setItem(TOKEN_KEY, res.access_token);
-      localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${res.access_token}`;
       setToken(res.access_token);
-      setUser(res.user);
+
+      // Reload user using /api/auth/me from Supabase PostgreSQL
+      const meUser = await api.getMe();
+      localStorage.setItem(USER_KEY, JSON.stringify(meUser));
+      setUser(meUser);
+      return meUser;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const registerAndLogin = async (userData: { name: string; email: string; password: string; role?: string; state?: string; phone?: string; mobile_number?: string; sms_alerts_enabled?: boolean }) => {
+  const registerAndLogin = async (userData: { name: string; email: string; password: string; role?: string; state?: string; phone?: string; mobile_number?: string; sms_alerts_enabled?: boolean }): Promise<User> => {
     setIsLoading(true);
+    const cleanUserData = {
+      ...userData,
+      email: userData.email.trim().toLowerCase(),
+    };
     try {
-      await api.register(userData);
+      await api.register(cleanUserData);
       // Auto-login upon successful registration
-      const res = await api.login({ email: userData.email, password: userData.password });
+      const res = await api.login({ email: cleanUserData.email, password: cleanUserData.password });
       localStorage.setItem(TOKEN_KEY, res.access_token);
-      localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${res.access_token}`;
       setToken(res.access_token);
-      setUser(res.user);
+
+      const meUser = await api.getMe();
+      localStorage.setItem(USER_KEY, JSON.stringify(meUser));
+      setUser(meUser);
+      return meUser;
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    delete apiClient.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
   };

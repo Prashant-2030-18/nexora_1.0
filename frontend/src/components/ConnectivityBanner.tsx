@@ -15,10 +15,11 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useConnectivity, ConnectionState } from '../context/ConnectivityContext';
 import { useGPS } from '../context/GPSContext';
 import {
-  Wifi, WifiOff, Navigation, Map, AlertTriangle, Radio,
+  Wifi, WifiOff, Navigation, Map, AlertTriangle, Radio, Route, ArrowRight,
   MessageSquare, Satellite, RefreshCw, CheckCircle, X, ChevronDown, ChevronUp,
 } from 'lucide-react';
 
@@ -84,6 +85,7 @@ export function ConnectivityBanner() {
     syncProgress, isSyncing, getOfflineAgeMinutes,
   } = useConnectivity();
   const { gps, isTracking } = useGPS();
+  const navigate = useNavigate();
 
   const [expanded, setExpanded] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: string; props: ToastProps }>>([]);
@@ -155,7 +157,7 @@ export function ConnectivityBanner() {
 
   const offlineAgeMin = getOfflineAgeMinutes();
 
-  // ── Compact status strip ───────────────────────────────────────────────────
+  // ── Status check ───────────────────────────────────────────────────────────
   const isOffline = connectionState === 'OFFLINE';
   const isDegraded = connectionState === 'DEGRADED';
   const isRestoring = connectionState === 'RESTORING';
@@ -169,6 +171,38 @@ export function ConnectivityBanner() {
 
   return (
     <>
+      {/* Top Offline Notification Banner */}
+      {isOffline && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="w-full bg-amber-950/95 border-b border-amber-600/60 p-3.5 sm:p-4 text-amber-200 shadow-xl transition-all duration-300 z-[1900] box-border"
+        >
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 h-auto min-h-0 w-full overflow-hidden">
+            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 shrink-0 mt-0.5 sm:mt-0">
+                <WifiOff className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0 text-xs sm:text-sm leading-relaxed whitespace-normal break-words text-amber-100">
+                <span className="font-extrabold uppercase tracking-wide text-amber-300 mr-2">
+                  OFFLINE MODE ACTIVE:
+                </span>
+                You are currently disconnected from network servers. NEXORA is operating seamlessly using cached spatial maps, IndexedDB route data, and local SACHET disaster intelligence. GPS tracking remains fully active.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/routes')}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-xl text-xs sm:text-sm transition-all shadow-md shrink-0 w-full sm:w-auto cursor-pointer font-sans active:scale-95"
+            >
+              <Route className="w-4 h-4" />
+              <span>Open Route Planner</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+            </button>
+          </div>
+        </div>
+      )}
       {/* Toast container */}
       <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 max-w-sm w-full">
         {toasts.map(t => <Toast key={t.id} {...t.props} />)}
