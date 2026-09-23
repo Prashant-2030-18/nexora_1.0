@@ -8,8 +8,8 @@ from .models import User
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 VAULT_FILE = os.path.join(DATA_DIR, "user_registry_vault.json")
 
-# Deterministic static bcrypt hash for default test accounts (Password: TestPassword123)
-STATIC_TEST_HASH = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeg6Lruj3vjPGga31lW"
+# Deterministic static bcrypt hash for default test accounts (Password: Password@123)
+STATIC_TEST_HASH = "$2b$12$Vch20WoKdKg2YI8qrryS3.ABAA5pT55SNkShHmWGcnTeKPLi7w9fO"
 
 DEFAULT_SEED_USERS = [
     {
