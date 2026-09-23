@@ -6,18 +6,26 @@ from sqlalchemy.orm import Session
 from .models import User
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
-BACKUP_FILE = os.path.join(DATA_DIR, "user_registry_backup.json")
+VAULT_FILE = os.path.join(DATA_DIR, "user_registry_vault.json")
 
-def _get_password_hash(password: str) -> str:
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+# Deterministic static bcrypt hash for default test accounts (Password: TestPassword123)
+STATIC_TEST_HASH = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeg6Lruj3vjPGga31lW"
 
-# Default seed accounts guaranteed to always exist and work across any restart
 DEFAULT_SEED_USERS = [
     {
         "name": "Ram Kumar",
         "email": "ram@gmail.com",
-        "password_hash": _get_password_hash("TestPassword123"),
+        "password_hash": STATIC_TEST_HASH,
+        "role": "citizen",
+        "state": "Assam",
+        "phone": "+919876543210",
+        "sms_alerts_enabled": True,
+        "is_active": True
+    },
+    {
+        "name": "Ram Kumar",
+        "email": "ram@gmail.com",
+        "password_hash": STATIC_TEST_HASH,
         "role": "citizen",
         "state": "Assam",
         "phone": "+919876543210",
@@ -27,7 +35,7 @@ DEFAULT_SEED_USERS = [
     {
         "name": "Test Citizen",
         "email": "citizen.test@nexora.gov.in",
-        "password_hash": _get_password_hash("TestPassword123"),
+        "password_hash": STATIC_TEST_HASH,
         "role": "citizen",
         "state": "Assam",
         "phone": "+919800000001",
@@ -37,7 +45,7 @@ DEFAULT_SEED_USERS = [
     {
         "name": "MDoNER Administrator",
         "email": "admin@nexora.gov.in",
-        "password_hash": _get_password_hash("TestPassword123"),
+        "password_hash": STATIC_TEST_HASH,
         "role": "admin",
         "state": "All",
         "phone": "+919800000000",
@@ -47,7 +55,7 @@ DEFAULT_SEED_USERS = [
     {
         "name": "Logistics Officer",
         "email": "logistics@nexora.gov.in",
-        "password_hash": _get_password_hash("TestPassword123"),
+        "password_hash": STATIC_TEST_HASH,
         "role": "logistics_operator",
         "state": "Assam",
         "phone": "+919800000002",
@@ -56,31 +64,31 @@ DEFAULT_SEED_USERS = [
     }
 ]
 
-def load_backup_registry() -> Dict[str, Dict[str, Any]]:
-    """Load persistent backup registry from JSON file."""
+def load_vault_registry() -> Dict[str, Dict[str, Any]]:
+    """Load persistent vault registry from JSON file."""
     os.makedirs(DATA_DIR, exist_ok=True)
     registry = {}
     
-    # Pre-populate defaults
+    # Pre-populate default seed accounts
     for user_data in DEFAULT_SEED_USERS:
         registry[user_data["email"].lower()] = user_data
 
-    if os.path.exists(BACKUP_FILE):
+    if os.path.exists(VAULT_FILE):
         try:
-            with open(BACKUP_FILE, "r", encoding="utf-8") as f:
+            with open(VAULT_FILE, "r", encoding="utf-8") as f:
                 saved = json.load(f)
                 if isinstance(saved, dict):
                     for email, data in saved.items():
                         registry[email.lower()] = data
         except Exception as e:
-            print(f"[USER REGISTRY] Warning loading backup file: {e}")
+            print(f"[USER REGISTRY] Notice loading vault file: {e}")
 
     return registry
 
-def save_user_to_backup(user_dict: Dict[str, Any]):
-    """Save a user record to the persistent JSON backup file."""
+def save_user_to_vault(user_dict: Dict[str, Any]):
+    """Save a user record to the persistent JSON vault file."""
     os.makedirs(DATA_DIR, exist_ok=True)
-    registry = load_backup_registry()
+    registry = load_vault_registry()
     email_key = user_dict["email"].strip().lower()
     registry[email_key] = {
         "name": user_dict.get("name", "User"),
@@ -93,18 +101,18 @@ def save_user_to_backup(user_dict: Dict[str, Any]):
         "is_active": bool(user_dict.get("is_active", True))
     }
     try:
-        with open(BACKUP_FILE, "w", encoding="utf-8") as f:
+        with open(VAULT_FILE, "w", encoding="utf-8") as f:
             json.dump(registry, f, indent=2)
-        print(f"[USER REGISTRY] Backed up user '{email_key}' to persistent registry file.")
+        print(f"[USER REGISTRY] Saved user '{email_key}' to persistent vault.")
     except Exception as e:
-        print(f"[USER REGISTRY] Warning saving backup file: {e}")
+        print(f"[USER REGISTRY] Notice saving vault file: {e}")
 
 def sync_registry_to_db(db: Session):
     """
     Ensure all backed-up users (including Ram@gmail.com and admin accounts)
     exist in the SQL database table. Called at startup and before login checks.
     """
-    registry = load_backup_registry()
+    registry = load_vault_registry()
     synced_count = 0
 
     for email_key, udata in registry.items():
@@ -122,6 +130,9 @@ def sync_registry_to_db(db: Session):
             )
             db.add(new_user)
             synced_count += 1
+        elif udata.get("password_hash") and existing.password_hash != udata["password_hash"]:
+            existing.password_hash = udata["password_hash"]
+            synced_count += 1
 
     if synced_count > 0:
         try:
@@ -129,4 +140,4 @@ def sync_registry_to_db(db: Session):
             print(f"[USER REGISTRY] Successfully restored/synced {synced_count} persistent user accounts into DB.")
         except Exception as e:
             db.rollback()
-            print(f"[USER REGISTRY] Warning syncing users to DB: {e}")
+            print(f"[USER REGISTRY] Notice syncing users to DB: {e}")

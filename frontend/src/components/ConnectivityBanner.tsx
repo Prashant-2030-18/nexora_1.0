@@ -44,34 +44,59 @@ interface ToastProps {
 }
 
 function Toast({ type, message, detail, onDismiss }: ToastProps) {
+  const navigate = useNavigate();
+
   useEffect(() => {
-    // Auto-dismiss after 8s for reconnect/sync, never for hazard
+    // Auto-dismiss after 10s for reconnect/sync, never for hazard or offline
     if (type !== 'offline' && type !== 'hazard') {
-      const t = setTimeout(onDismiss, 8000);
+      const t = setTimeout(onDismiss, 10000);
       return () => clearTimeout(t);
     }
   }, [type, onDismiss]);
 
   const borderCls =
-    type === 'offline' ? 'border-amber-500/70 bg-amber-950/90' :
-    type === 'hazard' ? 'border-red-500/70 bg-red-950/90' :
-    'border-emerald-500/70 bg-emerald-950/90';
+    type === 'offline' ? 'border-amber-400 bg-slate-900/98 text-amber-100 shadow-amber-950/50' :
+    type === 'hazard' ? 'border-red-500 bg-slate-900/98 text-red-100 shadow-red-950/50' :
+    'border-emerald-400 bg-slate-900/98 text-emerald-100 shadow-emerald-950/50';
 
   const icon =
-    type === 'offline' ? <WifiOff className="w-5 h-5 text-amber-400 shrink-0" /> :
-    type === 'hazard' ? <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" /> :
-    <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />;
+    type === 'offline' ? <WifiOff className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" /> :
+    type === 'hazard' ? <AlertTriangle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" /> :
+    <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />;
 
   return (
-    <div className={`flex items-start gap-3 p-4 rounded-xl border shadow-2xl ${borderCls} animate-in fade-in slide-in-from-top-2`}>
-      {icon}
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-white text-sm">{message}</p>
-        {detail && <p className="text-xs text-slate-300 mt-0.5">{detail}</p>}
+    <div
+      role="status"
+      aria-live="polite"
+      className={`flex flex-col gap-3 p-4 sm:p-5 rounded-2xl border-2 shadow-2xl ${borderCls} backdrop-blur-xl animate-in fade-in slide-in-from-top-4 w-full box-border`}
+    >
+      <div className="flex items-start gap-3 w-full">
+        {icon}
+        <div className="flex-1 min-w-0">
+          <p className="font-extrabold text-white text-sm sm:text-base leading-snug">{message}</p>
+          {detail && <p className="text-xs sm:text-sm text-slate-200 mt-1.5 leading-relaxed whitespace-normal break-words">{detail}</p>}
+        </div>
+        <button onClick={onDismiss} className="text-slate-400 hover:text-white p-1 shrink-0 cursor-pointer">
+          <X className="w-5 h-5" />
+        </button>
       </div>
-      <button onClick={onDismiss} className="text-slate-400 hover:text-white ml-1">
-        <X className="w-4 h-4" />
-      </button>
+
+      {type === 'offline' && (
+        <div className="pt-2.5 mt-1 border-t border-slate-800 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              onDismiss();
+              navigate('/routes');
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md cursor-pointer font-sans active:scale-95"
+          >
+            <Route className="w-4 h-4" />
+            <span>Open Route Planner</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -176,14 +201,14 @@ export function ConnectivityBanner() {
         <div
           role="status"
           aria-live="polite"
-          className="w-full bg-amber-950/95 border-b border-amber-600/60 p-3.5 sm:p-4 text-amber-200 shadow-xl transition-all duration-300 z-[1900] box-border"
+          className="relative z-[1800] my-3 mx-4 sm:mx-6 max-w-7xl rounded-2xl bg-gradient-to-r from-amber-950 via-slate-900 to-slate-950 border-2 border-amber-500/80 shadow-2xl p-4 sm:p-5 text-amber-200 box-border"
         >
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 h-auto min-h-0 w-full overflow-hidden">
-            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
-              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 shrink-0 mt-0.5 sm:mt-0">
-                <WifiOff className="w-5 h-5" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 h-auto min-h-0 w-full">
+            <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 shrink-0 mt-0.5 sm:mt-0">
+                <WifiOff className="w-6 h-6" />
               </div>
-              <div className="flex-1 min-w-0 text-xs sm:text-sm leading-relaxed whitespace-normal break-words text-amber-100">
+              <div className="flex-1 min-w-0 text-xs sm:text-sm leading-relaxed whitespace-normal break-words text-slate-100">
                 <span className="font-extrabold uppercase tracking-wide text-amber-300 mr-2">
                   OFFLINE MODE ACTIVE:
                 </span>
@@ -194,7 +219,7 @@ export function ConnectivityBanner() {
             <button
               type="button"
               onClick={() => navigate('/routes')}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-xl text-xs sm:text-sm transition-all shadow-md shrink-0 w-full sm:w-auto cursor-pointer font-sans active:scale-95"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold rounded-xl text-xs sm:text-sm transition-all shadow-lg shrink-0 w-full sm:w-auto cursor-pointer font-sans active:scale-95"
             >
               <Route className="w-4 h-4" />
               <span>Open Route Planner</span>
@@ -203,8 +228,9 @@ export function ConnectivityBanner() {
           </div>
         </div>
       )}
-      {/* Toast container */}
-      <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 max-w-sm w-full">
+
+      {/* Floating Toast container — top-20 z-[3000] below top sticky navbar */}
+      <div className="fixed top-20 right-4 sm:right-6 z-[3000] flex flex-col gap-3 max-w-md w-[calc(100vw-2rem)] pointer-events-auto">
         {toasts.map(t => <Toast key={t.id} {...t.props} />)}
       </div>
 

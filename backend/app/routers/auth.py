@@ -97,8 +97,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
     # Save to persistent backup file
     try:
-        from ..user_registry import save_user_to_backup
-        save_user_to_backup({
+        from ..user_registry import save_user_to_vault
+        save_user_to_vault({
             "name": new_user.name,
             "email": new_user.email,
             "password_hash": new_user.password_hash,
@@ -155,8 +155,8 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(user)
 
-            from ..user_registry import save_user_to_backup
-            save_user_to_backup({
+            from ..user_registry import save_user_to_vault
+            save_user_to_vault({
                 "name": user.name,
                 "email": user.email,
                 "password_hash": user.password_hash,
@@ -181,8 +181,8 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
             try:
                 user.password_hash = get_password_hash(login_data.password)
                 db.commit()
-                from ..user_registry import save_user_to_backup
-                save_user_to_backup({
+                from ..user_registry import save_user_to_vault
+                save_user_to_vault({
                     "name": user.name,
                     "email": user.email,
                     "password_hash": user.password_hash,
