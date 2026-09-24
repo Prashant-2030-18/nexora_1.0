@@ -101,8 +101,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${res.access_token}`;
       setToken(res.access_token);
 
-      // Reload user using /api/auth/me from Supabase PostgreSQL
-      const meUser = await api.getMe();
+      let meUser: User = res.user;
+      try {
+        const fetched = await api.getMe();
+        if (fetched) meUser = fetched;
+      } catch (meErr) {
+        console.warn('[NEXORA AUTH] getMe fallback to res.user:', meErr);
+      }
+
       localStorage.setItem(USER_KEY, JSON.stringify(meUser));
       setUser(meUser);
       return meUser;
@@ -125,7 +131,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${res.access_token}`;
       setToken(res.access_token);
 
-      const meUser = await api.getMe();
+      let meUser: User = res.user;
+      try {
+        const fetched = await api.getMe();
+        if (fetched) meUser = fetched;
+      } catch (meErr) {
+        console.warn('[NEXORA AUTH] getMe fallback to res.user:', meErr);
+      }
+
       localStorage.setItem(USER_KEY, JSON.stringify(meUser));
       setUser(meUser);
       return meUser;
