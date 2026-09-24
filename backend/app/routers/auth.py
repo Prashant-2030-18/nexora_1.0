@@ -179,6 +179,15 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
             try:
                 user.password_hash = get_password_hash(login_data.password)
                 db.commit()
+                print(f"[AUTH PASSWORD SYNC] Updated password hash in DB for '{user.email}' on login.")
+            except Exception as sync_pw_err:
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication failed. Please check your email and password."
+                )
+
+            try:
                 from ..user_registry import save_user_to_vault
                 save_user_to_vault({
                     "name": user.name,
@@ -190,13 +199,8 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
                     "sms_alerts_enabled": bool(getattr(user, "sms_alerts_enabled", True)),
                     "is_active": user.is_active
                 })
-                print(f"[AUTH PASSWORD SYNC] Successfully updated password hash for '{user.email}' on login.")
-            except Exception as sync_pw_err:
-                db.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authentication failed. Please check your email and password."
-                )
+            except Exception as vault_err:
+                print(f"[AUTH VAULT NOTICE] Could not write vault file: {vault_err}")
         else:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
