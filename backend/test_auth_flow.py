@@ -26,7 +26,7 @@ def run_auth_regression_tests():
     db = SessionLocal()
     try:
         # Cleanup any previous test users for a clean run
-        db.query(User).filter(User.email.like("%test.regression%")).delete(synchronize_session=False)
+        db.query(User).filter(User.email.like("%test.%")).delete(synchronize_session=False)
         db.commit()
     finally:
         db.close()

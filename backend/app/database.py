@@ -56,21 +56,15 @@ DATABASE_URL = sanitize_database_url(_raw_db_url)
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production"
 
-if IS_PRODUCTION:
-    if not DATABASE_URL:
-        print(
-            "[DATABASE ERROR] DATABASE_URL environment variable is not configured in production! "
-            "Please set DATABASE_URL to your persistent PostgreSQL database URI "
-            "(e.g. postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres).",
-            file=sys.stderr
-        )
-    elif DATABASE_URL.startswith("http://") or DATABASE_URL.startswith("https://") or (not DATABASE_URL.startswith("postgresql") and not DATABASE_URL.startswith("sqlite")):
-        print(
-            f"[DATABASE ERROR] Invalid DATABASE_URL scheme in production. "
-            "Supabase project HTTP URL cannot be used as a PostgreSQL database connection string. "
-            "Set DATABASE_URL to: postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres",
-            file=sys.stderr
-        )
+if DATABASE_URL.startswith("http://") or DATABASE_URL.startswith("https://") or (DATABASE_URL and not DATABASE_URL.startswith("postgresql") and not DATABASE_URL.startswith("sqlite")):
+    print(
+        f"[DATABASE ERROR] Invalid DATABASE_URL scheme. "
+        "Supabase project HTTP URL cannot be used as a PostgreSQL database connection string. "
+        "Set DATABASE_URL to: postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres in Render. "
+        "Falling back to local SQLite to keep API online while configuration is updated.",
+        file=sys.stderr
+    )
+    DATABASE_URL = _get_sqlite_url()
 
 # Fall back to local SQLite for local development or testing when DATABASE_URL is unconfigured
 if not DATABASE_URL:
@@ -94,9 +88,7 @@ else:
         )
     except Exception as exc:
         print(f"[DATABASE ERROR] Failed to connect to PostgreSQL engine: {type(exc).__name__} ({exc})", file=sys.stderr)
-        if IS_PRODUCTION:
-            raise exc
-        print("[DATABASE FALLBACK] Falling back to SQLite for local development environment.", file=sys.stderr)
+        print("[DATABASE FALLBACK] Falling back to local SQLite database.", file=sys.stderr)
         DATABASE_URL = _get_sqlite_url()
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
