@@ -76,7 +76,7 @@ if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args=connect_args)
 else:
     # PostgreSQL (Supabase / Render)
-    if "supabase" in DATABASE_URL and "sslmode" not in DATABASE_URL:
+    if ("supabase" in DATABASE_URL or "pooler" in DATABASE_URL) and "sslmode" not in DATABASE_URL:
         connect_args["sslmode"] = "require"
     try:
         engine = create_engine(
