@@ -61,11 +61,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (err: any) {
         const status = err?.response?.status;
-        console.warn('[NEXORA AUTH] Session check status:', status);
-
-        // ONLY clear credentials on genuine authentication failure (401 Unauthorized or 403 Forbidden)
-        if (status === 401 || status === 403) {
-          console.warn('[NEXORA AUTH] Token rejected by server. Clearing credentials.');
+        // ONLY clear credentials on genuine token rejection (401 Unauthorized)
+        if (status === 401) {
+          console.warn('[NEXORA AUTH] Token rejected by server (401). Clearing credentials.');
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
           delete apiClient.defaults.headers.common['Authorization'];
@@ -74,9 +72,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(null);
           }
         } else {
-          // If server is cold-starting, network error, 502, 503, 504, or timeout:
+          // If server is cold-starting, network error, 403 (role check), 502, 503, 504, or timeout:
           // DO NOT delete the stored token or user! Keep session alive.
-          console.log('[NEXORA AUTH] Server sleeping or network delayed. Retaining cached authenticated session.');
+          console.log('[NEXORA AUTH] Non-401 response or network delay. Retaining cached authenticated session.');
         }
       } finally {
         if (isMounted) {

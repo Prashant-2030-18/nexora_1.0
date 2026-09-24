@@ -109,18 +109,19 @@ def save_user_to_vault(user_dict: Dict[str, Any]):
 
 def sync_registry_to_db(db: Session):
     """
-    Ensure all backed-up users (including Ram@gmail.com and admin accounts)
-    exist in the SQL database table. Called at startup and before login checks.
+    Safely seed initial default accounts (e.g. admin@nexora.gov.in) into the SQL database if they do not exist yet.
+    NEVER overwrites, resets, or alters existing user password hashes or real accounts.
     """
     registry = load_vault_registry()
     synced_count = 0
 
     for email_key, udata in registry.items():
-        existing = db.query(User).filter(User.email.ilike(email_key)).first()
+        norm_email = email_key.strip().lower()
+        existing = db.query(User).filter(User.email == norm_email).first()
         if not existing:
             new_user = User(
                 name=udata.get("name", "User"),
-                email=email_key,
+                email=norm_email,
                 password_hash=udata.get("password_hash"),
                 role=udata.get("role", "citizen"),
                 state=udata.get("state", "Assam"),
@@ -130,14 +131,11 @@ def sync_registry_to_db(db: Session):
             )
             db.add(new_user)
             synced_count += 1
-        elif udata.get("password_hash") and existing.password_hash != udata["password_hash"]:
-            existing.password_hash = udata["password_hash"]
-            synced_count += 1
 
     if synced_count > 0:
         try:
             db.commit()
-            print(f"[USER REGISTRY] Successfully restored/synced {synced_count} persistent user accounts into DB.")
+            print(f"[USER REGISTRY] Provisioned {synced_count} missing default seed account(s) into database.")
         except Exception as e:
             db.rollback()
-            print(f"[USER REGISTRY] Notice syncing users to DB: {e}")
+            print(f"[USER REGISTRY] Notice seeding accounts to DB: {e}")

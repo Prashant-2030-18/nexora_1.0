@@ -74,7 +74,7 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     normalized_phone = normalize_mobile_number(raw_phone)
 
     norm_email = user_in.email.strip().lower()
-    existing = db.query(User).filter(User.email.ilike(norm_email)).first()
+    existing = db.query(User).filter(User.email == norm_email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -95,22 +95,6 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    # Save to persistent backup file
-    try:
-        from ..user_registry import save_user_to_vault
-        save_user_to_vault({
-            "name": new_user.name,
-            "email": new_user.email,
-            "password_hash": new_user.password_hash,
-            "role": new_user.role,
-            "state": new_user.state,
-            "phone": new_user.phone,
-            "sms_alerts_enabled": new_user.sms_alerts_enabled,
-            "is_active": new_user.is_active
-        })
-    except Exception as backup_err:
-        print(f"[AUTH REGISTRATION BACKUP NOTICE] {backup_err}")
-
     # Log audit action
     audit = AuditLog(
         user_email=new_user.email,
@@ -125,87 +109,22 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
     norm_email = login_data.email.strip().lower()
-    
-    # Always sync persistent vault registry to DB before lookup so hash updates apply immediately
-    try:
-        from ..user_registry import sync_registry_to_db
-        sync_registry_to_db(db)
-    except Exception as sync_err:
-        print(f"[AUTH LOGIN SYNC NOTICE] {sync_err}")
 
-    # Check database
-    user = db.query(User).filter(User.email.ilike(norm_email)).first()
+    # Query persistent database for user by normalized email
+    user = db.query(User).filter(User.email == norm_email).first()
 
-    # If user still not found in DB table, auto-provision account on demand to ensure zero downtime login experience
-    if not user:
-        try:
-            pw_hash = get_password_hash(login_data.password)
-            name_part = norm_email.split('@')[0].capitalize()
-            user = User(
-                name=name_part if name_part else "User",
-                email=norm_email,
-                password_hash=pw_hash,
-                role="citizen",
-                state="Assam",
-                is_active=True
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-
-            from ..user_registry import save_user_to_vault
-            save_user_to_vault({
-                "name": user.name,
-                "email": user.email,
-                "password_hash": user.password_hash,
-                "role": user.role,
-                "state": user.state,
-                "is_active": True
-            })
-            print(f"[AUTH AUTO-PROVISION] Auto-created account for '{norm_email}' on login.")
-        except Exception as prov_err:
-            db.rollback()
-            print(f"[AUTH AUTO-PROVISION NOTICE] {prov_err}")
-
-    # Verify password or sync password hash to ensure zero-lockout login experience
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed. Please check your email and password."
         )
 
+    # Strictly verify submitted password against stored hash without modifying DB
     if not verify_password(login_data.password, user.password_hash):
-        if login_data.password and len(login_data.password) >= 4:
-            try:
-                user.password_hash = get_password_hash(login_data.password)
-                db.commit()
-                print(f"[AUTH PASSWORD SYNC] Updated password hash in DB for '{user.email}' on login.")
-            except Exception as sync_pw_err:
-                db.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authentication failed. Please check your email and password."
-                )
-
-            try:
-                from ..user_registry import save_user_to_vault
-                save_user_to_vault({
-                    "name": user.name,
-                    "email": user.email,
-                    "password_hash": user.password_hash,
-                    "role": user.role,
-                    "state": user.state,
-                    "phone": user.phone,
-                    "sms_alerts_enabled": bool(getattr(user, "sms_alerts_enabled", True)),
-                    "is_active": user.is_active
-                })
-            except Exception as vault_err:
-                print(f"[AUTH VAULT NOTICE] Could not write vault file: {vault_err}")
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication failed. Please check your email and password."
-            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed. Please check your email and password."
+        )
 
     if not user.is_active:
         raise HTTPException(

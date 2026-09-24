@@ -56,21 +56,24 @@ DATABASE_URL = sanitize_database_url(_raw_db_url)
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production"
 
-# Validate database scheme: If user provided an HTTP/HTTPS Supabase API URL instead of a PostgreSQL URI, warn and fallback
-if DATABASE_URL.startswith("http://") or DATABASE_URL.startswith("https://") or (DATABASE_URL and not DATABASE_URL.startswith("postgresql") and not DATABASE_URL.startswith("sqlite")):
-    print(
-        f"[DATABASE WARNING] DATABASE_URL starts with an HTTP/HTTPS scheme instead of 'postgresql://'. "
-        "Supabase project URL cannot be used as a database connection string. "
-        "Please set DATABASE_URL to: postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres in Render. "
-        "Falling back to local SQLite to keep API online.",
-        file=sys.stderr
-    )
-    DATABASE_URL = _get_sqlite_url()
+if IS_PRODUCTION:
+    if not DATABASE_URL:
+        print(
+            "[DATABASE ERROR] DATABASE_URL environment variable is not configured in production! "
+            "Please set DATABASE_URL to your persistent PostgreSQL database URI "
+            "(e.g. postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres).",
+            file=sys.stderr
+        )
+    elif DATABASE_URL.startswith("http://") or DATABASE_URL.startswith("https://") or (not DATABASE_URL.startswith("postgresql") and not DATABASE_URL.startswith("sqlite")):
+        print(
+            f"[DATABASE ERROR] Invalid DATABASE_URL scheme in production. "
+            "Supabase project HTTP URL cannot be used as a PostgreSQL database connection string. "
+            "Set DATABASE_URL to: postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres",
+            file=sys.stderr
+        )
 
-# Fall back to local SQLite if DATABASE_URL is not set
+# Fall back to local SQLite for local development or testing when DATABASE_URL is unconfigured
 if not DATABASE_URL:
-    if IS_PRODUCTION:
-        print("[DATABASE WARNING] DATABASE_URL not set in production! Falling back to SQLite.", file=sys.stderr)
     DATABASE_URL = _get_sqlite_url()
 
 connect_args = {}
@@ -79,7 +82,6 @@ if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args=connect_args)
 else:
     # PostgreSQL (Supabase / Render)
-    # Ensure SSL mode is enabled for Supabase
     if "supabase" in DATABASE_URL and "sslmode" not in DATABASE_URL:
         connect_args["sslmode"] = "require"
     try:
@@ -91,8 +93,10 @@ else:
             max_overflow=10,
         )
     except Exception as exc:
-        print(f"[DATABASE ERROR] Failed to create PostgreSQL engine: {type(exc).__name__} ({exc})", file=sys.stderr)
-        print("[DATABASE FALLBACK] Falling back to SQLite to ensure zero-downtime service availability.", file=sys.stderr)
+        print(f"[DATABASE ERROR] Failed to connect to PostgreSQL engine: {type(exc).__name__} ({exc})", file=sys.stderr)
+        if IS_PRODUCTION:
+            raise exc
+        print("[DATABASE FALLBACK] Falling back to SQLite for local development environment.", file=sys.stderr)
         DATABASE_URL = _get_sqlite_url()
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
