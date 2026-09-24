@@ -126,17 +126,15 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
     norm_email = login_data.email.strip().lower()
     
+    # Always sync persistent vault registry to DB before lookup so hash updates apply immediately
+    try:
+        from ..user_registry import sync_registry_to_db
+        sync_registry_to_db(db)
+    except Exception as sync_err:
+        print(f"[AUTH LOGIN SYNC NOTICE] {sync_err}")
+
     # Check database
     user = db.query(User).filter(User.email.ilike(norm_email)).first()
-
-    # If user not found in DB table (e.g. SQLite wiped on Render container cold start), sync from persistent registry
-    if not user:
-        try:
-            from ..user_registry import sync_registry_to_db
-            sync_registry_to_db(db)
-            user = db.query(User).filter(User.email.ilike(norm_email)).first()
-        except Exception as sync_err:
-            print(f"[AUTH LOGIN SYNC NOTICE] {sync_err}")
 
     # If user still not found in DB table, auto-provision account on demand to ensure zero downtime login experience
     if not user:
