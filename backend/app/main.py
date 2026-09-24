@@ -176,24 +176,24 @@ def on_startup():
     # Safely initialize database schema
     init_db()
 
-    db = SessionLocal()
-    try:
-        # Print integration status
-        print("=" * 60)
-        print("  NEXORA PLATFORM INITIALIZATION — MDoNER (SIH26002)")
-        print(f"  • Environment:     {settings.ENVIRONMENT}")
-        print(f"  • Gemini AI:        {'CONFIGURED & ACTIVE' if settings.is_gemini_configured else 'NOT CONFIGURED'}")
-        print(f"  • OpenWeatherMap:   {'CONFIGURED & ACTIVE' if settings.is_openweather_configured else 'NOT CONFIGURED (Using Open-Meteo Fallback)'}")
-        print(f"  • SACHET NDMA:      {'CONFIGURED & ACTIVE' if settings.is_sachet_configured else 'NOT CONFIGURED'}")
-        sms_state = "CONFIGURED" if settings.SMS_PROVIDER and settings.SMS_API_KEY else "NOT CONFIGURED (Simulation)"
-        print(f"  • SMS Fallback:     {sms_state}")
-        print(f"  • Satellite Comms:  NOT CONFIGURED (no SDK registered)")
-        print(f"  • Storage:          {'Supabase Storage' if settings.is_supabase_configured else 'Local filesystem (dev)'}")
-        cors_info = ", ".join(_allowed_origins) if len(_allowed_origins) <= 5 else f"{len(_allowed_origins)} origins"
-        print(f"  • CORS Origins:     {cors_info}")
-        print(f"  • Offline Threshold: {settings.JOURNEY_OFFLINE_THRESHOLD_SECONDS}s heartbeat → OFFLINE_ASSUMED")
-        print("=" * 60)
+    # Print integration status
+    print("=" * 60)
+    print("  NEXORA PLATFORM INITIALIZATION — MDoNER (SIH26002)")
+    print(f"  • Environment:     {settings.ENVIRONMENT}")
+    print(f"  • Gemini AI:        {'CONFIGURED & ACTIVE' if settings.is_gemini_configured else 'NOT CONFIGURED'}")
+    print(f"  • OpenWeatherMap:   {'CONFIGURED & ACTIVE' if settings.is_openweather_configured else 'NOT CONFIGURED (Using Open-Meteo Fallback)'}")
+    print(f"  • SACHET NDMA:      {'CONFIGURED & ACTIVE' if settings.is_sachet_configured else 'NOT CONFIGURED'}")
+    sms_state = "CONFIGURED" if settings.SMS_PROVIDER and settings.SMS_API_KEY else "NOT CONFIGURED (Simulation)"
+    print(f"  • SMS Fallback:     {sms_state}")
+    print(f"  • Satellite Comms:  NOT CONFIGURED (no SDK registered)")
+    print(f"  • Storage:          {'Supabase Storage' if settings.is_supabase_configured else 'Local filesystem (dev)'}")
+    cors_info = ", ".join(_allowed_origins) if len(_allowed_origins) <= 5 else f"{len(_allowed_origins)} origins"
+    print(f"  • CORS Origins:     {cors_info}")
+    print(f"  • Offline Threshold: {settings.JOURNEY_OFFLINE_THRESHOLD_SECONDS}s heartbeat → OFFLINE_ASSUMED")
+    print("=" * 60)
 
+    # 1. Geographic baseline seed
+    with SessionLocal() as db:
         try:
             state_count = db.query(State).count()
             if state_count == 0:
@@ -205,42 +205,47 @@ def on_startup():
                 run_seed(db)
                 print("[SUCCESS] Production NER baseline dataset initialized.")
         except Exception as seed_err:
-            print(f"[SEED NOTICE] Seed initialization skipped or completed: {seed_err}")
+            db.rollback()
+            print(f"[SEED NOTICE] Seed initialization check: {seed_err}")
 
+    # 2. User registry sync
+    with SessionLocal() as db:
         try:
             from .user_registry import sync_registry_to_db
             sync_registry_to_db(db)
         except Exception as reg_err:
+            db.rollback()
             print(f"[REGISTRY NOTICE] User registry sync: {reg_err}")
 
-        # Check if an administrator exists
-        admin_count = db.query(User).filter(User.role == "admin").count()
-        if admin_count == 0:
-            admin_email = os.getenv("ADMIN_EMAIL")
-            admin_password = os.getenv("ADMIN_PASSWORD")
-            if admin_email and admin_password:
-                import bcrypt
-                pw_hash = bcrypt.hashpw(admin_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-                new_admin = User(
-                    name=os.getenv("ADMIN_NAME", "MDoNER Administrator"),
-                    email=admin_email,
-                    password_hash=pw_hash,
-                    role="admin",
-                    state=os.getenv("ADMIN_STATE", "All"),
-                    phone=os.getenv("ADMIN_PHONE"),
-                    is_active=True
-                )
-                db.add(new_admin)
-                db.commit()
-                print(f"[ADMIN SETUP] Initial administrator provisioned from environment: {admin_email}")
-            else:
-                print("[SECURITY NOTICE] No administrator account found in database.")
-                print("[SECURITY NOTICE] To provision an administrator, run: python create_admin.py")
-                print("[SECURITY NOTICE] Or set ADMIN_EMAIL and ADMIN_PASSWORD in environment.")
-    except Exception as e:
-        print(f"[STARTUP] Init check: {e}")
-    finally:
-        db.close()
+    # 3. Admin user check
+    with SessionLocal() as db:
+        try:
+            admin_count = db.query(User).filter(User.role == "admin").count()
+            if admin_count == 0:
+                admin_email = os.getenv("ADMIN_EMAIL")
+                admin_password = os.getenv("ADMIN_PASSWORD")
+                if admin_email and admin_password:
+                    import bcrypt
+                    pw_hash = bcrypt.hashpw(admin_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+                    new_admin = User(
+                        name=os.getenv("ADMIN_NAME", "MDoNER Administrator"),
+                        email=admin_email,
+                        password_hash=pw_hash,
+                        role="admin",
+                        state=os.getenv("ADMIN_STATE", "All"),
+                        phone=os.getenv("ADMIN_PHONE"),
+                        is_active=True
+                    )
+                    db.add(new_admin)
+                    db.commit()
+                    print(f"[ADMIN SETUP] Initial administrator provisioned from environment: {admin_email}")
+                else:
+                    print("[SECURITY NOTICE] No administrator account found in database.")
+                    print("[SECURITY NOTICE] To provision an administrator, run: python create_admin.py")
+                    print("[SECURITY NOTICE] Or set ADMIN_EMAIL and ADMIN_PASSWORD in environment.")
+        except Exception as admin_err:
+            db.rollback()
+            print(f"[ADMIN SETUP NOTICE] {admin_err}")
 
 @app.get("/")
 def root():
